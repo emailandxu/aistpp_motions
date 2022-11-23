@@ -7,6 +7,8 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import axes3d, Axes3D
 import torch
 from smplx import SMPL
+from tqdm import tqdm
+from scipy.ndimage import gaussian_filter1d 
 
 MOTIONS_ROOT = Path(__file__).parent.joinpath("data").joinpath("motions")
 SMPL_DIR = Path(__file__).parent.joinpath("data").joinpath("spml_model")
@@ -126,6 +128,38 @@ def show(ps=None):
             plot_pose(_p, fig, ax, scale=200)
     plt.show()
 
+
+
+def pae_window(v):
+    past_window_size = 60
+    future_window_size = 60
+
+    _past = lambda current: current - past_window_size
+    _future = lambda current: current + 1 + future_window_size # include one frame of current
+    
+    windows = []
+
+    # --- past --current ---- future
+    # --- past --- current --- future
+    current = past_window_size
+    past = _past(current)
+    future = _future(current)
+
+    while future < len(v):
+        
+        # 3.3 Network Training substract a window-based mean
+        windowed_v = v[past:future]
+        # windowed_v = windowed_v - windowed_v.mean()
+
+        windows.append(windowed_v)
+
+        past = _past(current)
+        future = _future(current)
+        current+=1
+    
+    return np.stack(list(windows), axis=0)
+
+
 class DataList():
     """
     doc and download page: https://google.github.io/aistplusplus_dataset/download.html
@@ -149,3 +183,49 @@ class DataList():
             return p, root_p
         else:
             return p
+
+class PAEDataList():
+    def __init__(self) -> None:
+        self.datalist = DataList()
+
+        _ws = []
+        _frameids = []
+        _bvhids = []
+
+        self.ps = {}
+        
+        for bvhid, [bvhpath, p] in enumerate(tqdm(zip(map(str,self.datalist.paths), self.datalist))):
+            # remove root pos
+            p = p - p[:, [0]]
+            
+            self.ps[bvhpath] = p
+
+            #calc velocity
+            v = p[1:] - p[:-1]
+
+            w = pae_window(v)
+            # window, joint, 3, time
+            w = w.transpose(0, 2, 3, 1) # move time(in-window) dim to the last one
+                
+            # window, joint*3, time
+            w = w.reshape(w.shape[0], -1, w.shape[-1])
+
+            # smooth it with gaussian filter along with the time axis
+            # w = gaussian_filter1d(w, sigma=3, axis=-1)
+            
+            # w = w * 10
+
+            _ws.append(w)
+            _frameids.extend(np.arange(len(w)) + 60)
+            _bvhids.extend([bvhid]*w.shape[0])
+        
+        self.ws = np.concatenate(_ws, axis=0)
+        self.bvhids = _bvhids
+        self.frameids = _frameids
+    
+    def __len__(self):
+        return len(self.ws)
+    
+    def __getitem__(self, idx):
+        return self.bvhids[idx], self.bvhpaths[self.bvhids[idx]], self.ws[idx]
+ 

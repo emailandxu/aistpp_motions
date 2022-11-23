@@ -1,3 +1,4 @@
 aistpp/data/*
 __pycache__
 .vscode
+Dataset/*
