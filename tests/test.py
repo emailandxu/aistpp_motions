@@ -1,9 +1,5 @@
 from . import aistpp
 
-def test_aistpp_kpoint_shape():
-    time, joint, dof = aistpp.kpoint.DataList()[0].shape
-    assert dof == 3 and joint == 17
-
 def test_aistpp_smpl_shape():
     data = aistpp.smpl.DataList()
     time, joint, dof = data[0].shape

@@ -8,7 +8,7 @@ from mpl_toolkits.mplot3d import axes3d, Axes3D
 import torch
 from smplx import SMPL
 
-DATA_ROOT = Path(__file__).parent.joinpath("data").joinpath("motions")
+MOTIONS_ROOT = Path(__file__).parent.joinpath("data").joinpath("motions")
 SMPL_DIR = Path(__file__).parent.joinpath("data").joinpath("spml_model")
 
 @lru_cache(maxsize=1)
@@ -88,15 +88,6 @@ def load(path):
 
     return p, root_p
 
-def iter():
-    """
-    p: (time, joint, dof), joint = 24
-    root_p : (time, joint, dof), joint = 24
-    """
-    for path in DATA_ROOT.glob("*.pkl"):
-        lr, root_p = load(path)
-        yield lr, root_p
-
 def show(ps=None):
     from itertools import chain
     from tqdm import tqdm
@@ -128,7 +119,7 @@ def show(ps=None):
     
     fig, ax = create_canvas()
     if ps is None:
-        for _p in tqdm(chain.from_iterable((p for p, root_p in iter()))):
+        for _p in tqdm(chain.from_iterable((p for p, root_p in (load(path) for path in MOTIONS_ROOT.glob("*.pkl"))))):
             plot_pose(_p, fig, ax, scale=200)
     else:
         for _p in tqdm(ps):
@@ -142,7 +133,7 @@ class DataList():
     """
     def __init__(self, data_root=None, include_rootp=False) -> None:
         if data_root is None:
-            self.data_root = DATA_ROOT
+            self.data_root = MOTIONS_ROOT
         else:
             self.data_root = Path(data_root)
 
@@ -153,8 +144,8 @@ class DataList():
         return len(self.paths)
     
     def __getitem__(self, idx):
-        lr, root_p = load(self.paths[idx])
+        p, root_p = load(self.paths[idx])
         if self.include_rootp:
-            return lr, root_p
+            return p, root_p
         else:
-            return lr
+            return p
