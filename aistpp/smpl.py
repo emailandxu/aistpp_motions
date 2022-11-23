@@ -61,7 +61,7 @@ def model(smpl_dir=None) -> SMPL:
     if smpl_dir is None:
         smpl_dir = SMPL_DIR
 
-    return SMPL(model_path=smpl_dir, gender='MALE', batch_size=1)
+    return SMPL(model_path=smpl_dir, gender='FEMALE', batch_size=1)
 
 def load(path):
     """
