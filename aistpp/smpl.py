@@ -202,21 +202,21 @@ class DataList():
     doc and download page: https://google.github.io/aistplusplus_dataset/download.html
     download keypoint3d and extract to data directory of this module.
     """
-    def __init__(self, data_root=None, include_rootp=False) -> None:
+    def __init__(self, data_root=None, include_lr=False) -> None:
         if data_root is None:
             self.data_root = MOTIONS_ROOT
         else:
             self.data_root = Path(data_root)
 
         self.paths = list(self.data_root.glob("*.pkl"))
-        self.include_rootp = include_rootp
+        self.include_lr = include_lr
 
     def __len__(self, ) -> int:
         return len(self.paths)
     
     def __getitem__(self, idx):
         p, lr = load(self.paths[idx])
-        if self.include_rootp:
+        if self.include_lr:
             return p, lr
         else:
             return p
