@@ -227,5 +227,5 @@ class PAEDataList():
         return len(self.ws)
     
     def __getitem__(self, idx):
-        return self.bvhids[idx], self.bvhpaths[self.bvhids[idx]], self.ws[idx]
+        return self.bvhids[idx], str(self.datalist.paths[self.bvhids[idx]]), self.ws[idx]
  
