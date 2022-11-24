@@ -10,10 +10,10 @@ def test_aistpp_smpl_shape():
         raise e
 
     data = aistpp.smpl.DataList(include_rootp=True)
-    p, root_p = data[0]
+    p, lr = data[0]
     
     # time dimension equals
-    assert p.shape[0] == root_p.shape[0]
+    assert p.shape[0] == lr.shape[0]
 
 
 if __name__ == "__main__":

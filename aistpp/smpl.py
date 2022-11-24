@@ -1,4 +1,5 @@
 from functools import lru_cache
+import time
 from matplotlib import pyplot as plt
 import numpy as np
 import pickle
@@ -7,6 +8,8 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import axes3d, Axes3D
 import torch
 from smplx import SMPL
+from smplx.utils import SMPLOutput
+import vedo
 
 MOTIONS_ROOT = Path(__file__).parent.joinpath("data").joinpath("motions")
 SMPL_DIR = Path(__file__).parent.joinpath("data").joinpath("spml_model")
@@ -57,36 +60,70 @@ def skel_conn_map():
     )
 
 @lru_cache(maxsize=-1)
-def model(smpl_dir=None) -> SMPL:
+def _model(smpl_dir=None) -> SMPL:
     if smpl_dir is None:
         smpl_dir = SMPL_DIR
 
     return SMPL(model_path=smpl_dir, gender='FEMALE', batch_size=1)
 
-def load(path):
-    """
-    p: (time, joint, dof), joint = 24
-    root_p : (time, joint, dof), joint = 24
-    """
-    with open(path, "rb") as f:
-        obj = pickle.load(f)
-
-    smpl_loss, smpl_poses, smpl_scaling, smpl_trans = obj.values()
-
-    smpl_output = model().forward(
+def model(smpl_poses, smpl_scaling, smpl_trans) -> SMPLOutput:
+    return _model().forward(
             global_orient=torch.from_numpy(smpl_poses[:, 0:1]).float(),
             body_pose=torch.from_numpy(smpl_poses[:, 1:]).float(),
             transl=torch.from_numpy(smpl_trans).float(),
             scaling=torch.from_numpy(smpl_scaling.reshape(1, 1)).float(),
     )
 
+def load_smpl(path):
+    """
+    return: smpl_loss, smpl_poses, smpl_scaling, smpl_trans
+    """
+    with open(path, "rb") as f:
+        obj = pickle.load(f)
+
+    smpl_loss, smpl_poses, smpl_scaling, smpl_trans = obj.values()
+    return smpl_loss, smpl_poses, smpl_scaling, smpl_trans
+
+def smpl_to_p(smpl_poses, smpl_scaling, smpl_trans):
+    smpl_output = model(smpl_poses, smpl_scaling, smpl_trans)
+
     # although smpl_poses has 24 joint, but the output global position will have 45 joints
     # hands and feets joints will be added at the tail 
     # so just trim the first 24 joints to maintain the amount of joints
     p = smpl_output.joints.detach().numpy()[:, :24, :]
-    root_p = smpl_trans # time, dof
+    return p
 
-    return p, root_p
+def load(path):
+    """
+    p: (time, joint, dof), joint = 24
+    lr : (time, joint, dof), joint = 24
+    """
+    smpl_loss, smpl_poses, smpl_scaling, smpl_trans = load_smpl(path)
+    
+    # global positions of joints
+    p = smpl_to_p(smpl_poses, smpl_scaling, smpl_trans)
+
+    # local rotations of joints
+    lr = smpl_poses
+
+    return p, lr
+
+def _vedo_show(smpl_poses, smpl_scaling, smpl_trans):
+
+    smpl_output = model(smpl_poses, smpl_scaling, smpl_trans)
+
+    #frames of vertices
+    vertices = smpl_output.vertices.detach().numpy()
+
+    for i in range(len(vertices)):
+        mesh = vedo.Mesh(vertices[i])
+        plotter = vedo.show(mesh, interactive=False, bg="black")
+        plotter.remove(mesh)
+        time.sleep(1/60)
+
+def vedo_show(path):
+    smpl_loss, smpl_poses, smpl_scaling, smpl_trans = load_smpl(path)
+    _vedo_show(smpl_poses, smpl_scaling, smpl_trans)
 
 def show(ps=None):
     from itertools import chain
@@ -119,7 +156,7 @@ def show(ps=None):
     
     fig, ax = create_canvas()
     if ps is None:
-        for _p in tqdm(chain.from_iterable((p for p, root_p in (load(path) for path in MOTIONS_ROOT.glob("*.pkl"))))):
+        for _p in tqdm(chain.from_iterable((p for p, lr in (load(path) for path in MOTIONS_ROOT.glob("*.pkl"))))):
             plot_pose(_p, fig, ax, scale=200)
     else:
         for _p in tqdm(ps):
@@ -144,8 +181,8 @@ class DataList():
         return len(self.paths)
     
     def __getitem__(self, idx):
-        p, root_p = load(self.paths[idx])
+        p, lr = load(self.paths[idx])
         if self.include_rootp:
-            return p, root_p
+            return p, lr
         else:
             return p
