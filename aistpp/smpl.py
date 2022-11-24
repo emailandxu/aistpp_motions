@@ -16,6 +16,14 @@ from scipy.ndimage import gaussian_filter1d
 MOTIONS_ROOT = Path(__file__).parent.joinpath("data").joinpath("motions")
 SMPL_DIR = Path(__file__).parent.joinpath("data").joinpath("spml_model")
 
+def set_motion_dir(path:str):
+    global MOTIONS_ROOT
+    MOTIONS_ROOT = Path(path)
+
+def set_smpl_dir(path:str):
+    global SMPL_DIR
+    SMPL_DIR = Path(path)
+
 @lru_cache(maxsize=1)
 def skel():
     return [
